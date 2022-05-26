@@ -92,22 +92,6 @@ async function run() {
       );
       res.send({ result, token });
     });
-    /**
-     * Verify Existing User
-     * As the Put request can serve the purpose, this will skip for now
-     */
-    // app.get('/user/:email', verifyJWT, async (req, res) => {
-    //   const email = req.params.email;
-    //   const filter = { email: email };
-    //   const user = await usersCollection.findOne(filter);
-
-    //   const token = jwt.sign(
-    //     { email: email },
-    //     process.env.ACCESS_TOKEN_SECRET,
-    //     { expiresIn: '1h' }
-    //   );
-    //   res.send({ user, token });
-    // });
 
     // Find All tools
     app.get('/tools', async (req, res) => {
@@ -127,13 +111,45 @@ async function run() {
       res.send(cursor);
     });
 
-    // Purchase Related Route
+    // Purchase/Order Related Route
     app.post('/purchase', async (req, res) => {
       const product = req.body;
       const result = await ordersCollection.insertOne(product);
+      const updatedStock = await updateStock({
+        id: product.productId,
+        orderQty: product.orderQuantity,
+      });
+      // to update stock qty
+      // {
+      //   productId: '628cac57ab4f688f6c244c03';
+      //   name: 'Tools 2';
+      //   img: 'https://api.lorem.space/image/shoes?w=400&h=225';
+      //   price: '100';
+      //   description: 'Sample description for tools 2.';
+      //   orderQuantity: '20';
+      // }
 
       res.send({ success: true, result });
     });
+
+    const updateStock = async (product) => {
+      const query = { _id: ObjectId(product.id) };
+      const cursor = await toolsCollection.findOne(query);
+      const newStockQty =
+        parseInt(cursor.availableQty) - parseInt(product.orderQty);
+      const updatedProduct = { ...cursor, availableQty: newStockQty };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: updatedProduct,
+      };
+
+      const result = await toolsCollection.updateOne(query, updateDoc, options);
+
+      console.log(product);
+      console.log(cursor);
+      console.log(updatedProduct);
+    };
+    // updateStock({ id: '628cac57ab4f688f6c244c03', orderQty: 10 });
   } finally {
   }
 }
